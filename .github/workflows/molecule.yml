@@ -43,9 +43,6 @@ jobs:
             image: geerlingguy/docker-debian12-ansible
           - label: rockylinux-8
             image: geerlingguy/docker-rockylinux8-ansible
-          # Ajoute/enlève des images si besoin :
-          # - label: rockylinux-9
-          #   image: geerlingguy/docker-rockylinux9-ansible
 
     steps:
       - name: Checkout
