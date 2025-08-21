@@ -1,0 +1,5 @@
+ansible>=9
+ansible-lint
+molecule>=6
+molecule-plugins[docker]>=24.0.0
+docker
