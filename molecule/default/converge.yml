@@ -1,0 +1,106 @@
+- name: Converge (Traefik dashboard insecure)
+  hosts: all
+  become: true
+  gather_facts: true
+
+  pre_tasks:
+    # 1) Télécharger l’archive sur le CONTROLEUR au chemin attendu par le rôle
+    - name: Pre-download Traefik archive on controller
+      ansible.builtin.get_url:
+        url: "https://github.com/traefik/traefik/releases/download/v{{ traefik_version }}/traefik_v{{ traefik_version }}_linux_amd64.tar.gz"
+        dest: "/tmp/traefik-{{ traefik_version }}.linux-amd64.tar.gz"
+        mode: "0644"
+      delegate_to: localhost
+      run_once: true
+      become: false
+
+    # 2) Décompresser en local vers /tmp pour obtenir /tmp/traefik
+    - name: Unarchive traefik locally to /tmp
+      ansible.builtin.unarchive:
+        src: "/tmp/traefik-{{ traefik_version }}.linux-amd64.tar.gz"
+        dest: "/tmp"
+        remote_src: false
+        creates: "/tmp/traefik"
+      delegate_to: localhost
+      run_once: true
+      become: false
+
+    # 3) S’assurer que le binaire est exécutable
+    - name: Ensure /tmp/traefik is executable (controller)
+      ansible.builtin.file:
+        path: "/tmp/traefik"
+        mode: "0755"
+        state: file
+      delegate_to: localhost
+      run_once: true
+      become: false
+
+  roles:
+    # Appel du rôle local par chemin absolu pour éviter tout souci de FQCN
+    - role: "{{ lookup('env', 'MOLECULE_PROJECT_DIRECTORY') }}"
+      vars:
+        traefik_version: "2.6.1"
+        traefik_config:
+          api:
+            insecure: true
+            dashboard: true
+          entryPoints:
+            traefik:
+              address: ":8080"
+            http:
+              address: ":80"
+
+
+  handlers:
+    - name: bounce traefik
+      listen:
+        - restart traefik
+        - reload traefik
+      ansible.builtin.systemd:
+        name: traefik
+        state: restarted      # 'restarted' marche même si le unit ne supporte pas 'reload'
+        daemon_reload: true
+      become: true
+
+  # Pas de handlers requis côté rôle -> on le (re)démarre explicitement ici
+  post_tasks:
+    - name: Reload systemd units
+      ansible.builtin.systemd:
+        daemon_reload: true
+
+    - name: Enable + start Traefik
+      ansible.builtin.systemd:
+        name: traefik
+        state: started
+        enabled: true
+
+    - name: Wait for Traefik API (8080)
+      ansible.builtin.wait_for:
+        host: 127.0.0.1
+        port: 8080
+        timeout: 60
+
+    - name: Check Traefik API returns JSON
+      ansible.builtin.uri:
+        url: http://127.0.0.1:8080/api/rawdata
+        method: GET
+        status_code: 200
+        return_content: true
+      register: traefik_api
+      retries: 5
+      delay: 2
+      until: traefik_api.status == 200
+
+    - name: Check dashboard HTML is served
+      ansible.builtin.uri:
+        url: http://127.0.0.1:8080/dashboard/
+        method: GET
+        status_code: 200
+        return_content: true
+      register: traefik_dash
+
+    - name: Assert dashboard content looks OK
+      ansible.builtin.assert:
+        that:
+          - "'Traefik' in traefik_dash.content"
+        fail_msg: "Le dashboard ne semble pas servi correctement."

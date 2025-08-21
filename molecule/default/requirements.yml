@@ -1,0 +1,5 @@
+---
+roles:
+  - name: simoncaron.traefik
+    src: https://github.com/Aurelie-Kamgang/ansible-role-traefik.git
+

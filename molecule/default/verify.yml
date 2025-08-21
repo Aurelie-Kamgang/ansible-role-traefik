@@ -1,0 +1,20 @@
+- name: Verify (Traefik dashboard)
+  hosts: all
+  become: true
+  gather_facts: false
+
+  tasks:
+    - name: Attend que Traefik écoute sur 8080
+      ansible.builtin.wait_for:
+        host: 127.0.0.1
+        port: 8080
+        timeout: 120
+        state: started
+
+    - name: Vérifie que /dashboard/ répond 200
+      ansible.builtin.uri:
+        url: http://127.0.0.1:8080/dashboard/
+        follow_redirects: all
+        return_content: false
+        status_code: 200
+

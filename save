@@ -1,0 +1,50 @@
+- name: Converge (Traefik dashboard insecure)
+  hosts: all
+  become: true
+  gather_facts: true   # <— on attend d’avoir créé le /tmp avant
+
+  vars:
+    # config minimale : dashboard en clair sur :8080
+    traefik_config:
+      api:
+        dashboard: true
+        insecure: true
+      entryPoints:
+        traefik:
+          address: ":8080"
+        http:
+          address: ":80"
+    traefik_copy_default_rules: false
+    traefik_rules_config: []
+
+  pre_tasks:
+    # Télécharge l’archive sur le CONTROLEUR à l’emplacement attendu par la tâche unarchive
+    - name: Pre-download Traefik archive on controller (workaround)
+      ansible.builtin.get_url:
+        url: "https://github.com/traefik/traefik/releases/download/v{{ traefik_version }}/traefik_v{{ traefik_version }}_linux_amd64.tar.gz"
+        dest: "/tmp/traefik-{{ traefik_version }}.linux-amd64.tar.gz"
+        mode: "0644"
+      delegate_to: localhost
+      run_once: true
+      become: false
+
+  tasks:
+    - name: Ensure remote tmp exists and is world-writable
+      raw: |
+        mkdir -p /tmp/.ansible/tmp && chmod 1777 /tmp /tmp/.ansible /tmp/.ansible/tmp
+      changed_when: false
+
+    - name: Show whoami and /tmp perms (debug)
+      raw: |
+        whoami; ls -ld /tmp /tmp/.ansible /tmp/.ansible/tmp
+      register: tmp_perms
+      changed_when: false
+
+    - debug:
+        var: tmp_perms.stdout_lines
+
+    - name: Gather facts now
+      setup:
+
+  roles:
+    - role: "{{ lookup('env', 'MOLECULE_PROJECT_DIRECTORY') }}"

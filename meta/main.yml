@@ -1,5 +1,6 @@
 ---
 galaxy_info:
+  namespace: simoncaron
   role_name: traefik
   author: Simon Caron
   description: Installing and configure Traefik Webserver
