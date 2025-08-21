@@ -2,7 +2,7 @@ name: Molecule CI
 
 on:
   push:
-    branches: [ master, main ]
+    branches: [ master ]
   pull_request:
   workflow_dispatch:
 
